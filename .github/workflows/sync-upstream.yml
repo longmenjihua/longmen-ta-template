@@ -1,0 +1,34 @@
+name: sync-upstream
+
+on:
+  repository_dispatch:
+    types: [sync]
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          git config user.name "longmen-bot"
+          git config user.email "bot@longmen.edu"
+      - name: Fetch upstream
+        run: |
+          git remote add upstream https://github.com/longmenjihua/longmen-ta-template.git || true
+          git fetch upstream main
+      - name: Sync files
+        run: |
+          # 排除每日工作目录和 .github 目录
+          git ls-tree -r --name-only upstream/main | grep -vE "^(每日输出|每日反馈|每日解答|每日补充|\.github)/" | while IFS= read -r f; do
+            git checkout upstream/main -- "$f" 2>/dev/null || echo "skip: $f"
+          done
+      - name: Commit and push
+        run: |
+          git add -A
+          git diff --staged --quiet || (git commit -m "sync: update from template $(date +'%Y-%m-%d')" && git push)
